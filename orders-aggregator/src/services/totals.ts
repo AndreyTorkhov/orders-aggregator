@@ -6,6 +6,9 @@ import type { CustomersService } from "./customers.js";
 export interface DailyTotal {
   date: string;
   total: number;
+  gross: number;
+  discount: number;
+  net: number;
 }
 
 const DAY = 86_400_000;
@@ -22,7 +25,6 @@ export class TotalsService {
    */
   async daily(customerId: string, from: string, to: string): Promise<DailyTotal[]> {
     const timezone = await this.customers.timezone(customerId);
-    const offset = tzOffsetMinutes(timezone, new Date());
 
     // Смещения таймзон в пределах ±14 ч: берём с запасом в сутки с каждой стороны
     const rows = await this.orders.paidCreatedBetween(
@@ -31,12 +33,21 @@ export class TotalsService {
       new Date(Date.parse(`${to}T00:00:00Z`) + 2 * DAY),
     );
 
-    const sums = new Map(datesBetween(from, to).map((d) => [d, 0]));
+    const sums = new Map(datesBetween(from, to).map((d) => [d, { grossKop: 0, netKop: 0 }]));
     for (const o of rows) {
-      const date = dateAtOffset(o.createdAt, offset);
+      const date = dateAtOffset(o.createdAt, tzOffsetMinutes(timezone, o.createdAt));
       const cur = sums.get(date);
-      if (cur !== undefined) sums.set(date, cur + o.amountKop);
+      if (cur !== undefined) {
+        cur.grossKop += o.amountKop;
+        cur.netKop += o.amountPaidKop;
+      }
     }
-    return [...sums].map(([date, kop]) => ({ date, total: fromKop(kop) }));
+    return [...sums].map(([date, { grossKop, netKop }]) => ({
+      date,
+      total: fromKop(grossKop),
+      gross: fromKop(grossKop),
+      discount: fromKop(grossKop - netKop),
+      net: fromKop(netKop),
+    }));
   }
 }

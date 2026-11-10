@@ -35,4 +35,21 @@ describe("POST /webhooks/order", () => {
     const res = await postWebhook(ctx.app, { id: "x" });
     expect(res.statusCode).toBe(400);
   });
+
+  it("обновляет фактическую оплату и не откатывает её повтором или старой версией", async () => {
+    const o = apiOrder({ amount: 100, amountPaid: 90 });
+    await postWebhook(ctx.app, o);
+    const fresh = { ...o, amountPaid: 80, updatedAt: "2026-02-11T00:00:00Z" };
+    expect((await postWebhook(ctx.app, fresh)).json()).toEqual({ result: "updated" });
+    expect((await postWebhook(ctx.app, o)).json()).toEqual({ result: "stale" });
+    expect((await postWebhook(ctx.app, fresh)).json()).toEqual({ result: "stale" });
+    const { rows } = await ctx.db.query(`SELECT amount_paid_kop FROM orders WHERE id = $1`, [o.id]);
+    expect(Number(rows[0].amount_paid_kop)).toBe(8000);
+  });
+
+  it.each([-1, "abc", null, "", 1001])("отклоняет невалидную фактическую оплату %s", async (amountPaid) => {
+    const o = apiOrder({ amountPaid });
+    expect((await postWebhook(ctx.app, o)).statusCode).toBe(400);
+    expect(await ctx.container.orders.apply(apiOrder({ id: o.id }))).toBe("created");
+  });
 });

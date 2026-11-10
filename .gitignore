@@ -1,14 +1,11 @@
-# Local dependencies and environment
 node_modules/
 .env
 .env.*
 !.env.example
 
-# Provided Docker images and packaged submissions
 /*.tar.gz
 /*.zip
 
-# Temporary files and generated output
 /.work/
 dist/
 coverage/

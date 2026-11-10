@@ -64,7 +64,7 @@ test/                 интеграционные тесты на реальн�
 |---|---|---|
 | POST | `/sync` | Забрать все заказы из внешнего API. Отвечает статистикой, когда всё забрано |
 | POST | `/webhooks/order` | Обновление заказа (тело — `Order` внешнего API). Повтор/устаревшая версия → `200 { result: "stale" }` |
-| GET | `/customers/:id/daily-totals?from=YYYY-MM-DD&to=YYYY-MM-DD` | Сумма оплаченных (`paid`) заказов по дням в таймзоне клиента: `[{ date, total }]` |
+| GET | `/customers/:id/daily-totals?from=YYYY-MM-DD&to=YYYY-MM-DD` | Оплаченные (`paid`) заказы по дням в таймзоне клиента: `[{ date, total, gross, discount, net }]`. `total = gross` — сумма до скидки, `net` — фактическая оплата, `discount = gross - net` |
 | GET | `/health` | Проверка живости |
 
 ## Внешний API (`ORDERS_API_URL`)
@@ -86,4 +86,4 @@ type Order = {
 };
 ```
 
-`discountPercent` и `amountPaid` появились в API недавно и сервисом пока не используются.
+`amountPaid` используется как источник фактической оплаты; по `discountPercent` она повторно не вычисляется. Для старых заказов без `amountPaid` оплата считается равной `amount`.
